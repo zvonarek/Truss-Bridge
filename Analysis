@@ -1,0 +1,148 @@
+%Clearing command window and all variables
+clc;
+clear;
+ 
+%Initializing variables and saving in a .mat
+C = [1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; 
+    1 1 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; 
+    0 1 1 0 0 0 0 0 0 1 0 0 0 1 1 0 0; 
+    0 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1 0;
+    0 0 0 1 1 0 0 0 0 0 0 1 0 0 0 0 0;
+    0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1;
+    0 0 0 0 0 1 0 0 1 0 0 0 1 1 0 0 0;
+    0 0 0 0 0 1 1 0 0 1 0 0 0 0 0 0 0;
+    0 0 0 0 0 0 1 1 0 0 1 0 0 0 1 0 0;
+    0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 1 1];
+    
+X = [0, .11, .215, .32, .425, .535, .11, .215, .32, .425];
+Y = [0, 0, 0, 0, 0, 0, -.105, -.105, -.105, -.105,];
+ 
+Sx = [1 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0];
+Sy = [0 1 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 1;
+    0 0 0;
+    0 0 0;
+    0 0 0;
+    0 0 0];
+ 
+L = [0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 4.91; 0; 0];
+ 
+ 
+ 
+sx=Sx;
+sy=Sy;
+c=C;
+save('input.mat','c','sx','sy','L','X','Y')
+ 
+%Plugging in matrixes based on the saved mat file
+data=load('input.mat');
+L=data.L;
+X=data.X;
+Y=data.Y;
+sx=data.sx;
+sy=data.sy;
+c=data.c;
+[j m]=size(c);
+Len=zeros(1,m);
+SRi=zeros(1,m);
+ 
+% initializing A matrix and calculating for the uncertainty of each member
+unc=zeros(1,m);
+A=[zeros(j,m),sx;zeros(j,m),sy];
+count=1;
+for row=1:(j)
+    for col=1:m
+        if(c(row,col)==1)
+            connect=c(:,col);
+            connect(row)=0;
+            connect=connect';
+            temp=find(connect,1); %Finds the location forces exist in
+        end
+        
+        d = sqrt( (X(row)-X(temp))^2 + (Y(row)-Y(temp))^2 );
+        if(c(row,col) ~=0 )
+            A(row,col)=c(row,col)*((-X(row)+X(temp))/d); %fills X forces in the A matrix
+            A(row+j,col)=c(row,col)*((-Y(row)+Y(temp))/d);%fills Y forces in the A matrix
+            if(count<=17) %Calculates uncertainty 
+                unc(count)=706.79/((d*100)^3);
+            end
+            count=count+1;
+        end
+    end
+end
+T=A\L; %Calculating tensions across every member
+ 
+%save('input.mat','c','sx','sy','X','Y','L')
+ 
+%Printing Outputs
+fprintf('\\%% EK301, Section A2, Group: Yang L, Kevin Z, Brendon S, 04/05/2019\nLoads: ');
+for i=1:length(L)
+    if(L(i)~=0)
+        fprintf('%.3f N',L(i));
+    end
+end
+fprintf('\nMember forces in Newtons\n');
+ 
+count=1;
+MemberRecord=zeros(1,length(T)-3);
+for i=1:length(T)-3
+    if(T(i)<0)
+        connect=c(:,i);
+        temp=find(connect,1);
+        connect(temp)=0;
+        temp2=find(connect,1);
+        d = sqrt( (X(temp2)-X(temp))^2 + (Y(temp2)-Y(temp))^2 )*100;
+        SRi(count)=-T(i)/((1384.4)/(d*2));%SRi Formula
+        MemberRecord(count)=i;
+        count=count+1;
+        T(i)=T(i)*-1;
+        fprintf('M%d: %.3f +/- %.3f (C)\n',i,T(i),unc(i));
+    elseif (T(i)==0)
+        T(i)=0;
+        fprintf('M%d: 0.000 +/- %.3f\n',i,unc(i));
+    else
+        fprintf('M%d: %.3f +/- %.3f (T)\n',i,T(i),unc(i));
+    end
+end
+ 
+fprintf('Reaction forces in Newtons:\n');
+fprintf('Sx1: %.3f\nSy1: %.3f\nSy2: %.3f\n',T(length(T)-2),T(length(T)-1),T(length(T)));
+D = zeros(1,length(X));
+count=1;
+tx=zeros(1,2*m);
+for row=1:(j)
+    for col=1:m
+        if(c(row,col)==1)
+            connect=c(:,col);
+            connect(row)=0;
+            connect=connect';
+            temp=find(connect,1);
+            d=sqrt( (X(row)-X(temp))^2 + (Y(row)-Y(temp))^2 );
+            tx(count)=d;
+            count=count+1;
+        end
+    end
+end
+ 
+x=(sum(tx)/2)*100;
+cost = 10*j + 1*x;
+fprintf("Cost of truss: $%.2f\n", cost);
+fail=L(find(L>0))/max(SRi); %fail formula here
+j12=find(c(:,MemberRecord(find(SRi==max(SRi))))==1);
+fprintf("First Member to Fail: Member %d, with length %.2f cm, at a theoretical max load of %.2f +/- %.2f N\n", ...
+MemberRecord(find(SRi==max(SRi))),sqrt( (X(j12(1))-X(j12(2)))^2 + (Y(j12(1))-Y(j12(2)))^2 )*100,fail,...
+fail*(unc(MemberRecord(find(SRi==max(SRi))))/T(MemberRecord(find(SRi==max(SRi))))));
+fprintf("Theoretical max load/cost ratio in N/$: %.4f\n",fail/cost);
